@@ -210,7 +210,7 @@ th{background:#333;color:#fff;}
 
 <script>
 
-// ✅ BASE ORDER (WITH PRE-CHECK)
+// ✅ BASE ORDER
 const baseOrder=["INIT","PRE-CHECK","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
 let stageOrder=[];
 
@@ -218,21 +218,36 @@ let uploadedFiles=[];
 let worker=new Worker('./fileWorker.js');
 let isSingle=false;
 
-// ✅ MODE
-modeSelect.onchange=function(){
-
+// ✅ ✅ ADD THIS (FULL RESET FUNCTION)
+function resetUI(){
   fileContainer.innerHTML='';
   uploadedFiles=[];
   weekCount.value="";
+  weekCount.classList.add("hidden");
+
+  bodyRow.innerHTML="";
+  headerRow.innerHTML="";
+  tableCard.classList.add("hidden");
+
+  progressBar.style.width="0%";
+}
+
+// ✅ MODE
+modeSelect.onchange=function(){
+
+  resetUI(); // ✅ CRITICAL
 
   if(this.value==="single"){
     isSingle=true;
-    weekCount.classList.add("hidden");
     createInputs(1,true);
   }
   else if(this.value==="multiple"){
     isSingle=false;
     weekCount.classList.remove("hidden");
+  }
+  else{
+    // ✅ SELECT MODE (RESET CASE)
+    isSingle=false;
   }
 };
 
@@ -250,7 +265,7 @@ function createInputs(count,isSingleMode=false){
 
     let div=document.createElement('div');
 
-    div.innerHTML=
+    div.innerHTML =
       isSingleMode
       ? `<input type="file">`
       : `📁 File ${i+1}: <input type="file">`;
@@ -265,7 +280,6 @@ function createInputs(count,isSingleMode=false){
 
 // ✅ HEADER
 function createHeader(){
-
   headerRow.innerHTML='';
 
   if(!isSingle){
@@ -365,7 +379,7 @@ worker.onmessage=function(e){
     all.push(weekAvg);
   });
 
-  // ✅ ✅ ✅ RESTORE "ALL FILES" ROW
+  // ✅ ALL FILES ROW
   if(!isSingle && results.length>1){
     addAverageRow(all);
   }
@@ -373,7 +387,7 @@ worker.onmessage=function(e){
   tableCard.classList.remove("hidden");
 };
 
-// ✅ ALL FILES ROW
+// ✅ AVERAGE ROW
 function addAverageRow(all){
 
   let row="<tr><td class='week'>All Files</td>";
