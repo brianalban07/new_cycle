@@ -22,7 +22,8 @@ self.onmessage = function(e) {
       if (s && !isNaN(st) && !isNaN(et)){
         const d = (et-st)/1000;
 
-        if (!dur[s]) {dur[s]=0; cnt[s]=0;}
+        if (!dur[s]) { dur[s]=0; cnt[s]=0; }
+
         dur[s]+=d;
         cnt[s]++;
       }
@@ -33,3 +34,4 @@ self.onmessage = function(e) {
 
   self.postMessage({results});
 };
+``
