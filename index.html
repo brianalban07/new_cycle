@@ -3,61 +3,135 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Cycle Time Analyzer</title>
 
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.jsscript>
 
 <style>
-body { font-family: Arial; margin: 20px; }
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-  margin-top: 20px;
+body {
+  font-family: 'Segoe UI', Arial;
+  background: #f4f6f9;
+  margin: 0;
 }
 
-th, td {
-  border: 1px solid black;
+/* ✅ Container */
+.container {
+  max-width: 1000px;
+  margin: 40px auto;
+  background: #fff;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
+}
+
+h2 { margin-bottom: 20px; }
+
+.controls select, .controls input {
   padding: 8px;
+  margin: 5px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+button {
+  padding: 10px 20px;
+  background: #0078d4;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+button:hover { background: #005ea6; }
+
+/* ✅ Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+th {
+  background: #3f4a5a;
+  color: white;
+}
+td, th {
+  padding: 8px;
+  border: 1px solid #ddd;
   text-align: center;
 }
 
-th { background: #6c7a89; color: white; }
-
-.week { background: #f4b400; }
-.total { background: #00a65a; color: white; }
+.week { background: #ffd966; }
+.total { background: #28a745; color: white; }
 
 .hidden { display: none; }
+
+/* ✅ ✅ Spinner Overlay */
+#loadingOverlay {
+  position: fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background: rgba(0,0,0,0.6);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction: column;
+  z-index:9999;
+  color:#fff;
+  font-size:18px;
+}
+
+.spinner {
+  width:50px;
+  height:50px;
+  border:6px solid #ccc;
+  border-top:6px solid #0078d4;
+  border-radius:50%;
+  animation: spin 1s linear infinite;
+  margin-bottom:15px;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
 </style>
 </head>
 
 <body>
 
-<h2>Cycle Time Analyzer</h2>
+<div class="container">
+  <h2>Cycle Time Analyzer</h2>
 
-<select id="modeSelect">
-  <option value="">Select Mode</option>
-  <option value="single">Single</option>
-  <option value="multiple">Multiple</option>
-</select>
+  <div class="controls">
+    <select id="modeSelect">
+      <option value="">Select Mode</option>
+      <option value="single">Single Week</option>
+      <option value="multiple">Multiple Weeks</option>
+    </select>
 
-<input type="number" id="weekCount" class="hidden" min="1" placeholder="Weeks">
+    <input type="number" id="weekCount" class="hidden" placeholder="No. of Weeks">
+  </div>
 
-<div id="fileContainer"></div>
+  <div id="fileContainer"></div>
 
-<button id="calculateBtn" class="hidden">Calculate</button>
+  <button id="calculateBtn" class="hidden">Calculate</button>
 
-<table>
-<thead><tr id="headerRow"></tr></thead>
-<tbody id="bodyRow"></tbody>
-</table>
+  <table>
+    <thead><tr id="headerRow"></tr></thead>
+    <tbody id="bodyRow"></tbody>
+  </table>
+</div>
+
+<!-- ✅ LOADING -->
+<div id="loadingOverlay" class="hidden">
+  <div class="spinner"></div>
+  Processing files, please wait...
+</div>
 
 <script>
 const stageOrder = ["INIT","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
 
 let uploadedFiles = [];
 let worker = new Worker('fileWorker.js');
+let isSingle = false;
 
 // ✅ MODE
 modeSelect.onchange = function() {
@@ -66,15 +140,17 @@ modeSelect.onchange = function() {
   bodyRow.innerHTML = '';
   calculateBtn.classList.add("hidden");
 
-  if (this.value === "multiple") {
-    weekCount.classList.remove("hidden");
-  } else {
+  if (this.value === "single") {
+    isSingle = true;
     weekCount.classList.add("hidden");
     createInputs(1);
+  } else {
+    isSingle = false;
+    weekCount.classList.remove("hidden");
   }
 };
 
-// ✅ CREATE INPUTS
+// ✅ INPUTS
 weekCount.onchange = function() {
   createInputs(parseInt(this.value));
 };
@@ -86,9 +162,7 @@ function createInputs(count) {
   for (let i=0;i<count;i++) {
     let div = document.createElement('div');
 
-    div.innerHTML = `
-      Week ${i+1}: <input type="file" data-i="${i}">
-    `;
+    div.innerHTML = `Week ${i+1}: <input type="file">`;
 
     div.querySelector('input').onchange = e => {
       uploadedFiles[i] = e.target.files[0];
@@ -101,12 +175,17 @@ function createInputs(count) {
 
 // ✅ HEADER
 function createHeader() {
-  headerRow.innerHTML = "<th>Week</th>";
+  headerRow.innerHTML = '';
+
+  if (!isSingle) {
+    headerRow.innerHTML += "<th>Week</th>";
+  }
+
   stageOrder.forEach(s=>headerRow.innerHTML+=`<th>${s}</th>`);
   headerRow.innerHTML += "<th>TOTAL</th>";
 }
 
-// ✅ TIME FORMAT
+// ✅ FORMAT
 function format(sec){
   const h = String(Math.floor(sec/3600)).padStart(2,'0');
   const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
@@ -114,8 +193,12 @@ function format(sec){
   return `${h}:${m}:${s}`;
 }
 
-// ✅ RECEIVE DATA FROM WORKER
+// ✅ RECEIVE RESULT
 worker.onmessage = function(e) {
+
+  // ✅ hide loading
+  loadingOverlay.classList.add("hidden");
+
   const {results} = e.data;
 
   bodyRow.innerHTML = '';
@@ -126,7 +209,11 @@ worker.onmessage = function(e) {
   results.forEach((res, i)=> {
 
     let total = 0;
-    let row = `<tr><td class="week">${i+1}</td>`;
+    let row = "<tr>";
+
+    if (!isSingle) {
+      row += `<td class="week">${i+1}</td>`;
+    }
 
     let avgObj = {};
 
@@ -147,8 +234,10 @@ worker.onmessage = function(e) {
     allWeekResults.push(avgObj);
   });
 
-  // ✅ ALL FILES ROW
-  addAverageRow(allWeekResults);
+  // ✅ only multiple
+  if (!isSingle && results.length > 1) {
+    addAverageRow(allWeekResults);
+  }
 };
 
 // ✅ FINAL ROW
@@ -157,7 +246,6 @@ function addAverageRow(allResults) {
   let total = 0;
 
   stageOrder.forEach(stage=>{
-
     let sum=0, count=0;
 
     allResults.forEach(w=>{
@@ -179,8 +267,11 @@ function addAverageRow(allResults) {
   bodyRow.innerHTML += row;
 }
 
-// ✅ SEND FILES TO WORKER
+// ✅ PROCESS
 calculateBtn.onclick = async function(){
+
+  // ✅ SHOW LOADING
+  loadingOverlay.classList.remove("hidden");
 
   let buffers = [];
 
@@ -190,7 +281,6 @@ calculateBtn.onclick = async function(){
 
   worker.postMessage({buffers});
 };
-
 </script>
 
 </body>
