@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cycle Time Analyzer</title>
 
-
-<!-- ✅ CORRECT SCRIPT -->
+<!-- ✅ Excel Library -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
-body { font-family: Arial; margin: 20px; background:#f4f6f9; }
+body {
+  font-family: Arial;
+  margin: 20px;
+  background:#f4f6f9;
+}
 
 .container {
   background:#fff;
@@ -30,18 +33,24 @@ button {
 
 .hidden { display:none; }
 
-/* Loading */
+/* ✅ LOADING DEFAULT HIDDEN */
 #loadingOverlay {
   position:fixed;
   top:0; left:0;
   width:100%; height:100%;
   background:rgba(0,0,0,0.5);
-  display:flex;
   justify-content:center;
   align-items:center;
   flex-direction:column;
   color:#fff;
   z-index:9999;
+
+  display:none; /* ✅ IMPORTANT */
+}
+
+/* ✅ SHOW CLASS */
+#loadingOverlay.show {
+  display:flex;
 }
 
 .spinner {
@@ -53,19 +62,23 @@ button {
   animation:spin 1s linear infinite;
 }
 
-@keyframes spin {100%{transform:rotate(360deg);}}
+@keyframes spin {
+  100% { transform:rotate(360deg); }
+}
 
-/* Table */
+/* TABLE */
 table {
   width:100%;
   border-collapse:collapse;
   margin-top:20px;
 }
+
 th,td {
   border:1px solid #ddd;
   padding:6px;
   text-align:center;
 }
+
 th { background:#333; color:#fff; }
 .week { background:#ffd966; }
 .total { background:#28a745; color:#fff; }
@@ -98,25 +111,25 @@ th { background:#333; color:#fff; }
 </div>
 
 <!-- ✅ LOADING -->
-<div id="loadingOverlay" class="hidden">
+<div id="loadingOverlay">
   <div class="spinner"></div>
   <div>Processing... please wait</div>
 </div>
 
-    window.onload = () => {
-  document.getElementById("loadingOverlay").classList.add("hidden");
-};
-  
 <script>
+
 const stageOrder = ["INIT","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
 
 let uploadedFiles = [];
 let isSingle = false;
-
-// ✅ CRITICAL FIX (path)
 let worker = new Worker('./fileWorker.js');
 
-// MODE
+// ✅ FORCE HIDE ON LOAD
+window.onload = () => {
+  loadingOverlay.classList.remove("show");
+};
+
+// MODE CHANGE
 modeSelect.onchange = function() {
   uploadedFiles = [];
   fileContainer.innerHTML = '';
@@ -173,13 +186,14 @@ function format(sec){
   let h=Math.floor(sec/3600);
   let m=Math.floor((sec%3600)/60);
   let s=Math.floor(sec%60);
+
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
 }
 
-// RECEIVE
+// ✅ WORKER RESPONSE
 worker.onmessage=function(e){
 
-  loadingOverlay.classList.add("hidden");
+  loadingOverlay.classList.remove("show");
 
   const {results}=e.data;
 
@@ -197,12 +211,14 @@ worker.onmessage=function(e){
     let avgObj={};
 
     stageOrder.forEach(s=>{
-      let avg=r.dur[s]?r.dur[s]/r.cnt[s]:0;
+      let avg = r.dur[s] ? r.dur[s]/r.cnt[s] : 0;
 
       if(avg>0){
         total+=avg;
         row+=`<td>${format(avg)}</td>`;
-      } else row+="<td>N/A</td>";
+      } else {
+        row+="<td>N/A</td>";
+      }
 
       avgObj[s]=avg;
     });
@@ -216,14 +232,14 @@ worker.onmessage=function(e){
   if(!isSingle && results.length>1) addAverageRow(all);
 };
 
-// ERROR FIX ✅
+// ✅ ERROR HANDLER
 worker.onerror=function(err){
   console.error(err);
-  loadingOverlay.classList.add("hidden");
-  alert("Worker failed. Check console.");
+  loadingOverlay.classList.remove("show");
+  alert("Worker error. Check console.");
 };
 
-// ADD AVERAGE
+// ADD AVERAGE ROW
 function addAverageRow(all){
   let row="<tr><td class='week'>All Files</td>";
   let total=0;
@@ -232,27 +248,32 @@ function addAverageRow(all){
     let sum=0,count=0;
 
     all.forEach(w=>{
-      if(w[stage]>0){ sum+=w[stage]; count++; }
+      if(w[stage]>0){
+        sum+=w[stage];
+        count++;
+      }
     });
 
-    let avg=count?sum/count:0;
+    let avg = count ? sum/count : 0;
 
     if(avg>0){
       total+=avg;
       row+=`<td>${format(avg)}</td>`;
-    } else row+="<td>N/A</td>";
+    } else {
+      row+="<td>N/A</td>";
+    }
   });
 
   row+=`<td class="total">${format(total)}</td></tr>`;
   bodyRow.innerHTML+=row;
 }
 
-// PROCESS
+// ✅ PROCESS
 calculateBtn.onclick=async function(){
 
   if(uploadedFiles.length===0) return;
 
-  loadingOverlay.classList.remove("hidden");
+  loadingOverlay.classList.add("show");
 
   let buffers=[];
 
@@ -262,6 +283,7 @@ calculateBtn.onclick=async function(){
 
   worker.postMessage({buffers});
 };
+
 </script>
 
 </body>
