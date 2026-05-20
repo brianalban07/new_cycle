@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PG548 Cycle & Average Time Calculation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #eef3f8;
+            color: #212529;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+        .container {
+            max-width: 80%;
+            margin: 20px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #343a40;
+        }
+        .fileGroup {
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #f1f3f5;
+            width: 100%;
+        }
+        select, input[type="file"], button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+            font-size: 16px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        button {
+            background-color: #007bff;
+            color: #ffffff;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #filesContainer {
+            max-width: 100%;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        table {
+            border-spacing: 0;
+            width: 100%;
+            margin-top: 10px;
+            font-size: 14px;
+            background-color: #ffffff;
+            box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            border: 1px solid #e9ecef;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #6c757d;
+            color: #f8f9fa;
+        }
+        tbody tr:nth-child(odd) td {
+            background-color: #ffffff;
+        }
+        tbody tr:nth-child(even) td {
+            background-color: #f8f9fa;
+        }
+        .avg-row td {
+            font-weight: bold;
+            background-color: #e2e6ea !important;
+            border-top: 2px solid #adb5bd;
+        }
+        td.blank:empty::before {
+            content: "N/A";
+            color: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PG548 Cycle & Average Time Calculation</h1>
+        <button id="startProcessBtn">How many files.xlsx to process?</button>
+        <div id="filesContainer"></div>
+        <button id="calculateSummaryBtn" style="display: none;">Calculate Summary</button>
+        <div style="margin-top: 20px; overflow-x: auto; width: 100%;">
+            <table id="summaryTable" style="display: none;">
+                <thead id="summaryTableHead"></thead>
+                <tbody id="summaryTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const stageOrder = ["INIT", "PRE-CHECK", "AST", "FLA", "IOT", "FCT", "FC2", "IST", "FPF", "NVL"];
+            const worker = new Worker('fileworker.js');
+            let fileResults = [];
+
+            document.getElementById("startProcessBtn").addEventListener("click", startProcess);
+            document.getElementById("calculateSummaryBtn").addEventListener("click", calculateSummary);
+
+            function startProcess() {
+                const fileCount = parseInt(prompt("How many .xlsx files do you want to process?"), 10);
+                if (isNaN(fileCount) || fileCount <= 0) {
+                    alert("Please enter a valid positive number.");
+                    return;
+                }
+                resetState();
+                generateFileInputs(fileCount);
+            }
+
+            function resetState() {
+                document.getElementById('summaryTable').style.display = 'none';
+                document.getElementById('calculateSummaryBtn').style.display = 'none';
+                document.getElementById('filesContainer').innerHTML = '';
+                fileResults = [];
+            }
+
+            function generateFileInputs(count) {
+                const filesContainer = document.getElementById('filesContainer');
+                filesContainer.innerHTML = '';
+
+                for (let i = 0; i < count; i++) {
+                    const fileGroup = document.createElement('div');
+                    fileGroup.className = 'fileGroup';
+                    const fileInput = document.createElement('input');
+                    fileInput.setAttribute('type', 'file');
+                    fileInput.setAttribute('accept', '.xls,.xlsx');
+                    fileInput.addEventListener('change', checkAllFilesSelected);
+                    fileGroup.appendChild(fileInput);
+                    filesContainer.appendChild(fileGroup);
+                }
+            }
+
+            function checkAllFilesSelected() {
+                const allSelected = Array.from(document.querySelectorAll('.fileGroup input[type="file"]'))
+                    .every(input => input.files.length > 0);
+                document.getElementById('calculateSummaryBtn').style.display = allSelected ? 'block' : 'none';
+            }
+
+            function calculateSummary() {
+                const fileGroups = document.querySelectorAll('.fileGroup');
+                fileResults = [];
+                fileGroups.forEach(fileGroup => {
+                    const file = fileGroup.querySelector('input[type="file"]').files[0];
+                    worker.postMessage({ file });
+                });
+
+                worker.onmessage = function(event) {
+                    fileResults.push(event.data);
+                    checkProcessingComplete();
+                };
+            }
+
+            function checkProcessingComplete() {
+                if (fileResults.length === document.querySelectorAll('.fileGroup').length) {
+                    displaySummaryTable(fileResults);
+                }
+            }
+
+            function displaySummaryTable(results) {
+                const thead = document.getElementById('summaryTableHead');
+                const tbody = document.getElementById('summaryTableBody');
+                thead.innerHTML = '<th>SKU</th>' + stageOrder.map(stage => `<th>${stage}</th>`).join('') + '<th>Total Time</th>';
+                tbody.innerHTML = '';
+
+                results.forEach(fileResult => {
+                    fileResult.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${row.sku}</td>` +
+                            stageOrder.map(stage => `<td>${row[stage] || 'N/A'}</td>`).join('') +
+                            `<td>${row.Total}</td>`;
+                        tbody.appendChild(tr);
+                    });
+                });
+
+                document.getElementById('summaryTable').style.display = 'table';
+            }
+        });
+    </script>
+</body>
+</html>
