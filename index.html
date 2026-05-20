@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cycle Time Analyzer</title>
 
-https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.jsscript>
+<!-- ✅ FIXED SCRIPT -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
 body {
@@ -14,7 +15,6 @@ body {
   margin: 0;
 }
 
-/* ✅ Container */
 .container {
   max-width: 1000px;
   margin: 40px auto;
@@ -41,18 +41,20 @@ button {
   border-radius: 5px;
   cursor: pointer;
 }
+
 button:hover { background: #005ea6; }
 
-/* ✅ Table */
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
 }
+
 th {
   background: #3f4a5a;
   color: white;
 }
+
 td, th {
   padding: 8px;
   border: 1px solid #ddd;
@@ -64,7 +66,7 @@ td, th {
 
 .hidden { display: none; }
 
-/* ✅ ✅ Spinner Overlay */
+/* ✅ LOADING */
 #loadingOverlay {
   position: fixed;
   top:0; left:0;
@@ -76,7 +78,6 @@ td, th {
   flex-direction: column;
   z-index:9999;
   color:#fff;
-  font-size:18px;
 }
 
 .spinner {
@@ -98,32 +99,32 @@ td, th {
 <body>
 
 <div class="container">
-  <h2>Cycle Time Analyzer</h2>
+<h2>Cycle Time Analyzer</h2>
 
-  <div class="controls">
-    <select id="modeSelect">
-      <option value="">Select Mode</option>
-      <option value="single">Single Week</option>
-      <option value="multiple">Multiple Weeks</option>
-    </select>
+<div class="controls">
+  <select id="modeSelect">
+    <option value="">Select Mode</option>
+    <option value="single">Single Week</option>
+    <option value="multiple">Multiple Weeks</option>
+  </select>
 
-    <input type="number" id="weekCount" class="hidden" placeholder="No. of Weeks">
-  </div>
+  <input type="number" id="weekCount" class="hidden" placeholder="No. of Weeks">
+</div>
 
-  <div id="fileContainer"></div>
+<div id="fileContainer"></div>
 
-  <button id="calculateBtn" class="hidden">Calculate</button>
+<button id="calculateBtn" class="hidden">Calculate</button>
 
-  <table>
-    <thead><tr id="headerRow"></tr></thead>
-    <tbody id="bodyRow"></tbody>
-  </table>
+<table>
+  <thead><tr id="headerRow"></tr></thead>
+  <tbody id="bodyRow"></tbody>
+</table>
 </div>
 
 <!-- ✅ LOADING -->
 <div id="loadingOverlay" class="hidden">
   <div class="spinner"></div>
-  Processing files, please wait...
+  <div>Processing files, please wait...</div>
 </div>
 
 <script>
@@ -133,7 +134,7 @@ let uploadedFiles = [];
 let worker = new Worker('fileWorker.js');
 let isSingle = false;
 
-// ✅ MODE
+// MODE
 modeSelect.onchange = function() {
   uploadedFiles = [];
   fileContainer.innerHTML = '';
@@ -150,7 +151,7 @@ modeSelect.onchange = function() {
   }
 };
 
-// ✅ INPUTS
+// INPUTS
 weekCount.onchange = function() {
   createInputs(parseInt(this.value));
 };
@@ -173,7 +174,7 @@ function createInputs(count) {
   }
 }
 
-// ✅ HEADER
+// HEADER
 function createHeader() {
   headerRow.innerHTML = '';
 
@@ -185,7 +186,7 @@ function createHeader() {
   headerRow.innerHTML += "<th>TOTAL</th>";
 }
 
-// ✅ FORMAT
+// FORMAT
 function format(sec){
   const h = String(Math.floor(sec/3600)).padStart(2,'0');
   const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
@@ -193,10 +194,9 @@ function format(sec){
   return `${h}:${m}:${s}`;
 }
 
-// ✅ RECEIVE RESULT
+// WORKER RESPONSE
 worker.onmessage = function(e) {
 
-  // ✅ hide loading
   loadingOverlay.classList.add("hidden");
 
   const {results} = e.data;
@@ -223,7 +223,9 @@ worker.onmessage = function(e) {
       if (avg>0){
         total += avg;
         row += `<td>${format(avg)}</td>`;
-      } else row += `<td>N/A</td>`;
+      } else {
+        row += `<td>N/A</td>`;
+      }
 
       avgObj[s] = avg;
     });
@@ -234,13 +236,20 @@ worker.onmessage = function(e) {
     allWeekResults.push(avgObj);
   });
 
-  // ✅ only multiple
+  // multiple only
   if (!isSingle && results.length > 1) {
     addAverageRow(allWeekResults);
   }
 };
 
-// ✅ FINAL ROW
+// ERROR HANDLER ✅ FIX LOOP ISSUE
+worker.onerror = function(err){
+  console.error(err);
+  loadingOverlay.classList.add("hidden");
+  alert("Error processing file.");
+};
+
+// FINAL ROW
 function addAverageRow(allResults) {
   let row = `<tr><td class="week">All Files</td>`;
   let total = 0;
@@ -260,17 +269,20 @@ function addAverageRow(allResults) {
     if (avg>0){
       total+=avg;
       row+=`<td>${format(avg)}</td>`;
-    } else row+=`<td>N/A</td>`;
+    } else {
+      row+=`<td>N/A</td>`;
+    }
   });
 
   row+=`<td class="total">${format(total)}</td></tr>`;
   bodyRow.innerHTML += row;
 }
 
-// ✅ PROCESS
+// PROCESS
 calculateBtn.onclick = async function(){
 
-  // ✅ SHOW LOADING
+  if (uploadedFiles.length === 0) return;
+
   loadingOverlay.classList.remove("hidden");
 
   let buffers = [];
