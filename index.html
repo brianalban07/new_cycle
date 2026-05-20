@@ -3,57 +3,123 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cycle Time Analyzer</title>
+<title>Cycle Time Dashboard</title>
 
-<!-- ✅ Excel Library -->
+<!-- ✅ Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body {
-  font-family: Arial;
-  margin: 20px;
+*{box-sizing:border-box;}
+
+body{
+  margin:0;
+  font-family:'Segoe UI', Arial;
+  display:flex;
   background:#f4f6f9;
 }
 
-.container {
-  background:#fff;
+.sidebar{
+  width:230px;
+  background:#1e293b;
+  color:#fff;
   padding:20px;
-  border-radius:10px;
-  max-width:900px;
-  margin:auto;
+  min-height:100vh;
 }
 
-button {
-  padding:8px 15px;
+.main{
+  flex:1;
+  display:flex;
+  justify-content:center;
+}
+
+.content{
+  width:100%;
+  max-width:1100px;
+  padding:30px;
+}
+
+.card{
+  background:#fff;
+  padding:20px;
+  border-radius:12px;
+  margin-bottom:25px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
+
+.controls{
+  display:flex;
+  gap:15px;
+  flex-wrap:wrap;
+}
+
+select,input{
+  padding:10px;
+}
+
+button{
+  padding:10px 18px;
   background:#0078d4;
-  border:none;
   color:#fff;
+  border:none;
+  border-radius:6px;
+}
+
+#fileContainer div{margin-bottom:8px;}
+
+.progress{
+  width:100%;
+  height:8px;
+  background:#ddd;
   border-radius:5px;
 }
 
-.hidden { display:none; }
+.progress-bar{
+  height:100%;
+  width:0%;
+  background:#28a745;
+}
 
-/* ✅ LOADING DEFAULT HIDDEN */
-#loadingOverlay {
+.table-container{overflow-x:auto;}
+
+table{
+  width:100%;
+  min-width:900px;
+  border-collapse: collapse;
+}
+
+th,td{
+  border:1px solid #ddd;
+  padding:8px;
+  text-align:center;
+}
+
+th{background:#333;color:#fff;}
+.week{ background:#ffd966; }
+.total{ background:#28a745; color:#fff; }
+
+.chart-wrapper{
+  max-width:600px;
+  margin:auto;
+}
+
+.hidden{display:none;}
+
+#loadingOverlay{
   position:fixed;
-  top:0; left:0;
-  width:100%; height:100%;
-  background:rgba(0,0,0,0.5);
+  top:0;left:0;
+  width:100%;height:100%;
+  background:rgba(0,0,0,0.6);
+  display:none;
   justify-content:center;
   align-items:center;
   flex-direction:column;
   color:#fff;
-  z-index:9999;
-
-  display:none; /* ✅ IMPORTANT */
 }
 
-/* ✅ SHOW CLASS */
-#loadingOverlay.show {
-  display:flex;
-}
+#loadingOverlay.show{display:flex;}
 
-.spinner {
+.spinner{
   border:5px solid #ccc;
   border-top:5px solid #0078d4;
   border-radius:50%;
@@ -62,35 +128,24 @@ button {
   animation:spin 1s linear infinite;
 }
 
-@keyframes spin {
-  100% { transform:rotate(360deg); }
-}
-
-/* TABLE */
-table {
-  width:100%;
-  border-collapse:collapse;
-  margin-top:20px;
-}
-
-th,td {
-  border:1px solid #ddd;
-  padding:6px;
-  text-align:center;
-}
-
-th { background:#333; color:#fff; }
-.week { background:#ffd966; }
-.total { background:#28a745; color:#fff; }
+@keyframes spin{100%{transform:rotate(360deg);}}
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<div class="sidebar">
+  <h2>Dashboard</h2>
+  <button onclick="exportExcel()">Export Excel</button>
+</div>
 
+<div class="main">
+<div class="content">
+
+<div class="card">
 <h2>Cycle Time Analyzer</h2>
 
+<div class="controls">
 <select id="modeSelect">
   <option value="">Select Mode</option>
   <option value="single">Single</option>
@@ -98,70 +153,83 @@ th { background:#333; color:#fff; }
 </select>
 
 <input type="number" id="weekCount" class="hidden" placeholder="No. of Weeks">
+</div>
 
 <div id="fileContainer"></div>
 
-<button id="calculateBtn" class="hidden">Calculate</button>
+<button id="calculateBtn">Calculate</button>
 
+<div class="progress">
+<div id="progressBar" class="progress-bar"></div>
+</div>
+</div>
+
+<div id="chartCard" class="card hidden">
+<h3 style="text-align:center;">Stage Trend</h3>
+<div class="chart-wrapper">
+<canvas id="chart"></canvas>
+</div>
+</div>
+
+<div class="card">
+<div class="table-container">
 <table>
 <thead><tr id="headerRow"></tr></thead>
 <tbody id="bodyRow"></tbody>
 </table>
-
+</div>
 </div>
 
-<!-- ✅ LOADING -->
+</div>
+</div>
+
 <div id="loadingOverlay">
-  <div class="spinner"></div>
-  <div>Processing... please wait</div>
+<div class="spinner"></div>
+<div>Processing... please wait</div>
 </div>
 
 <script>
 
-const stageOrder = ["INIT","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
+// ✅ BASE ORDER
+const baseOrder=["INIT","PRE-CHECK","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
+let stageOrder=[];
 
-let uploadedFiles = [];
-let isSingle = false;
-let worker = new Worker('./fileWorker.js');
+let uploadedFiles=[];
+let worker=new Worker('./fileWorker.js');
+let isSingle=false;
 
-// ✅ FORCE HIDE ON LOAD
-window.onload = () => {
-  loadingOverlay.classList.remove("show");
-};
+// MODE
+modeSelect.onchange=function(){
+  fileContainer.innerHTML='';
+  uploadedFiles=[];
 
-// MODE CHANGE
-modeSelect.onchange = function() {
-  uploadedFiles = [];
-  fileContainer.innerHTML = '';
-  bodyRow.innerHTML = '';
-  calculateBtn.classList.add("hidden");
-
-  if (this.value === "single") {
-    isSingle = true;
+  if(this.value==="single"){
+    isSingle=true;
     weekCount.classList.add("hidden");
-    createInputs(1);
-  } else {
-    isSingle = false;
+    createInputs(1,true);
+  }else{
+    isSingle=false;
     weekCount.classList.remove("hidden");
   }
 };
 
-// CREATE INPUTS
-weekCount.onchange = function() {
-  createInputs(parseInt(this.value));
+weekCount.onchange=function(){
+  createInputs(parseInt(this.value),false);
 };
 
-function createInputs(count){
+function createInputs(count,isSingleMode=false){
   fileContainer.innerHTML='';
-  uploadedFiles = new Array(count).fill(null);
+  uploadedFiles=new Array(count).fill(null);
 
-  for (let i=0;i<count;i++){
+  for(let i=0;i<count;i++){
     let div=document.createElement('div');
-    div.innerHTML=`Week ${i+1}: <input type="file">`;
+
+    div.innerHTML = isSingleMode
+      ? `<input type="file">`
+      : `Week ${i+1}: <input type="file">`;
 
     div.querySelector('input').onchange=e=>{
       uploadedFiles[i]=e.target.files[0];
-      if(uploadedFiles.every(f=>f)) calculateBtn.classList.remove("hidden");
     };
 
     fileContainer.appendChild(div);
@@ -171,13 +239,8 @@ function createInputs(count){
 // HEADER
 function createHeader(){
   headerRow.innerHTML='';
-
   if(!isSingle) headerRow.innerHTML+='<th>Week</th>';
-
-  stageOrder.forEach(s=>{
-    headerRow.innerHTML+=`<th>${s}</th>`;
-  });
-
+  stageOrder.forEach(s=>headerRow.innerHTML+=`<th>${s}</th>`);
   headerRow.innerHTML+='<th>TOTAL</th>';
 }
 
@@ -186,11 +249,41 @@ function format(sec){
   let h=Math.floor(sec/3600);
   let m=Math.floor((sec%3600)/60);
   let s=Math.floor(sec%60);
-
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
 }
 
-// ✅ WORKER RESPONSE
+// ✅ CALCULATE (FIXED BUG)
+calculateBtn.onclick = async function(){
+
+  if (!modeSelect.value) {
+    alert("Please select mode first.");
+    return;
+  }
+
+  if (uploadedFiles.length === 0) {
+    alert("Please choose file first.");
+    return;
+  }
+
+  if (uploadedFiles.some(f=>!f)) {
+    alert("Please select all required files.");
+    return;
+  }
+
+  progressBar.style.width="0%";
+  loadingOverlay.classList.add("show");
+
+  let buffers=[];
+
+  for(let i=0;i<uploadedFiles.length;i++){
+    buffers.push(await uploadedFiles[i].arrayBuffer());
+    progressBar.style.width=((i+1)/uploadedFiles.length*100)+"%";
+  }
+
+  worker.postMessage({buffers});
+};
+
+// ✅ RECEIVE
 worker.onmessage=function(e){
 
   loadingOverlay.classList.remove("show");
@@ -198,48 +291,59 @@ worker.onmessage=function(e){
   const {results}=e.data;
 
   bodyRow.innerHTML='';
+
+  // ✅ DETECT STAGES
+  let detected=new Set();
+  results.forEach(r=>{
+    Object.keys(r.dur).forEach(s=>detected.add(s));
+  });
+
+  stageOrder = baseOrder.filter(s=>detected.has(s));
+
   createHeader();
 
+  let chartData=[];
   let all=[];
 
   results.forEach((r,i)=>{
+
     let total=0;
     let row="<tr>";
 
-    if(!isSingle) row+=`<td class="week">${i+1}</td>`;
+    if(!isSingle){
+      row+=`<td class="week">${i+1}</td>`;
+    }
 
-    let avgObj={};
+    let weekAvg={};
 
     stageOrder.forEach(s=>{
-      let avg = r.dur[s] ? r.dur[s]/r.cnt[s] : 0;
+      let avg=r.dur[s]?r.dur[s]/r.cnt[s]:0;
 
       if(avg>0){
         total+=avg;
         row+=`<td>${format(avg)}</td>`;
-      } else {
+      }else{
         row+="<td>N/A</td>";
       }
 
-      avgObj[s]=avg;
+      weekAvg[s]=avg;
+      chartData.push(avg);
     });
 
     row+=`<td class="total">${format(total)}</td></tr>`;
     bodyRow.innerHTML+=row;
 
-    all.push(avgObj);
+    all.push(weekAvg);
   });
 
-  if(!isSingle && results.length>1) addAverageRow(all);
+  if(!isSingle && results.length>1){
+    addAverageRow(all);
+  }
+
+  chartCard.classList.remove("hidden");
+  drawChart(chartData);
 };
 
-// ✅ ERROR HANDLER
-worker.onerror=function(err){
-  console.error(err);
-  loadingOverlay.classList.remove("show");
-  alert("Worker error. Check console.");
-};
-
-// ADD AVERAGE ROW
 function addAverageRow(all){
   let row="<tr><td class='week'>All Files</td>";
   let total=0;
@@ -254,12 +358,12 @@ function addAverageRow(all){
       }
     });
 
-    let avg = count ? sum/count : 0;
+    let avg=count?sum/count:0;
 
     if(avg>0){
       total+=avg;
       row+=`<td>${format(avg)}</td>`;
-    } else {
+    }else{
       row+="<td>N/A</td>";
     }
   });
@@ -268,21 +372,26 @@ function addAverageRow(all){
   bodyRow.innerHTML+=row;
 }
 
-// ✅ PROCESS
-calculateBtn.onclick=async function(){
+// CHART
+function drawChart(data){
+  new Chart(document.getElementById('chart'),{
+    type:'bar',
+    data:{
+      labels:stageOrder,
+      datasets:[{
+        label:'Average Time',
+        data:data.slice(0,stageOrder.length),
+        backgroundColor:'#0078d4'
+      }]
+    }
+  });
+}
 
-  if(uploadedFiles.length===0) return;
-
-  loadingOverlay.classList.add("show");
-
-  let buffers=[];
-
-  for(let f of uploadedFiles){
-    buffers.push(await f.arrayBuffer());
-  }
-
-  worker.postMessage({buffers});
-};
+// EXPORT
+function exportExcel(){
+  let wb=XLSX.utils.table_to_book(document.querySelector("table"));
+  XLSX.writeFile(wb,"CycleTime.xlsx");
+}
 
 </script>
 
