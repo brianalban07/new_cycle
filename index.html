@@ -214,16 +214,18 @@ th{background:#333;color:#fff;}
 
 <script>
 
+// ✅ BASE ORDER
 const baseOrder=["INIT","PRE-CHECK","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
 let stageOrder=[];
 
 let uploadedFiles=[];
+let worker=new Worker('./fileWorker.js');
 let isSingle=false;
 
 // MODE
 modeSelect.onchange=function(){
   resetAll();
-  
+
   if(this.value==="single"){
     isSingle=true;
     weekCount.classList.add("hidden");
@@ -260,7 +262,7 @@ function createInputs(count,isSingleMode=false){
   }
 }
 
-// ✅ UPDATE STATUS
+// ✅ STATUS CHECK
 function updateStatus(){
   let count = uploadedFiles.filter(f=>f).length;
   fileCount.textContent = "Files: " + count;
@@ -290,10 +292,134 @@ function resetAll(){
   tableCard.classList.add("hidden");
 }
 
-// ✅ RUN
-calculateBtn.onclick=function(){
-  alert("✅ Ready to process! (Your worker logic still works)");
+// ✅ REAL PROCESS LOGIC (RESTORED)
+calculateBtn.onclick = async function(){
+
+  if(uploadedFiles.length===0) return;
+
+  progressBar.style.width="0%";
+  loadingOverlay.classList.add("show");
+
+  let buffers=[];
+
+  for(let i=0;i<uploadedFiles.length;i++){
+    buffers.push(await uploadedFiles[i].arrayBuffer());
+    progressBar.style.width = ((i+1)/uploadedFiles.length*100) + "%";
+  }
+
+  worker.postMessage({buffers});
 };
+
+// ✅ RECEIVE RESULT
+worker.onmessage=function(e){
+
+  loadingOverlay.classList.remove("show");
+
+  const {results}=e.data;
+
+  bodyRow.innerHTML='';
+
+  // ✅ DETECT STAGES
+  let detected=new Set();
+  results.forEach(r=>{
+    Object.keys(r.dur).forEach(s=>detected.add(s));
+  });
+
+  stageOrder = baseOrder.filter(s=>detected.has(s));
+
+  createHeader();
+
+  let chartData=[];
+  let all=[];
+
+  results.forEach((r,i)=>{
+
+    let total=0;
+    let row="<tr>";
+
+    if(!isSingle){
+      row+=`<td class="week">${i+1}</td>`;
+    }
+
+    let weekAvg={};
+
+    stageOrder.forEach(s=>{
+      let avg=r.dur[s]?r.dur[s]/r.cnt[s]:0;
+
+      if(avg>0){
+        total+=avg;
+        row+=`<td>${format(avg)}</td>`;
+      }else{
+        row+="<td>N/A</td>";
+      }
+
+      weekAvg[s]=avg;
+      chartData.push(avg);
+    });
+
+    row+=`<td class="total">${format(total)}</td></tr>`;
+    bodyRow.innerHTML+=row;
+
+    all.push(weekAvg);
+  });
+
+  if(!isSingle && results.length>1){
+    addAverageRow(all);
+  }
+
+  tableCard.classList.remove("hidden");
+};
+
+// ✅ HEADER
+function createHeader(){
+  headerRow.innerHTML='';
+  if(!isSingle) headerRow.innerHTML+='<th>File</th>';
+  stageOrder.forEach(s=>headerRow.innerHTML+=`<th>${s}</th>`);
+  headerRow.innerHTML+='<th>TOTAL</th>';
+}
+
+// ✅ AVERAGE ROW
+function addAverageRow(all){
+  let row="<tr><td class='week'>All Files</td>";
+  let total=0;
+
+  stageOrder.forEach(stage=>{
+    let sum=0,count=0;
+
+    all.forEach(w=>{
+      if(w[stage]>0){
+        sum+=w[stage];
+        count++;
+      }
+    });
+
+    let avg=count?sum/count:0;
+
+    if(avg>0){
+      total+=avg;
+      row+=`<td>${format(avg)}</td>`;
+    }else{
+      row+="<td>N/A</td>";
+    }
+  });
+
+  row+=`<td class="total">${format(total)}</td></tr>`;
+  bodyRow.innerHTML+=row;
+}
+
+// ✅ FORMAT
+function format(sec){
+  let h=Math.floor(sec/3600);
+  let m=Math.floor((sec%3600)/60);
+  let s=Math.floor(sec%60);
+  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+
+// ✅ EXPORT
+function exportExcel(){
+  let wb=XLSX.utils.table_to_book(document.querySelector("table"));
+  XLSX.writeFile(wb,"CycleTime.xlsx");
+}
 
 </script>
 
