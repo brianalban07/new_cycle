@@ -152,7 +152,7 @@ th{background:#333;color:#fff;}
   <option value="multiple">Multiple</option>
 </select>
 
-<input type="number" id="weekCount" class="hidden" placeholder="No. of Weeks">
+<input type="number" id="weekCount" class="hidden" placeholder="No. of Files">
 </div>
 
 <div id="fileContainer"></div>
@@ -226,7 +226,7 @@ function createInputs(count,isSingleMode=false){
 
     div.innerHTML = isSingleMode
       ? `<input type="file">`
-      : `Week ${i+1}: <input type="file">`;
+      : `File ${i+1}: <input type="file">`;
 
     div.querySelector('input').onchange=e=>{
       uploadedFiles[i]=e.target.files[0];
@@ -239,7 +239,7 @@ function createInputs(count,isSingleMode=false){
 // HEADER
 function createHeader(){
   headerRow.innerHTML='';
-  if(!isSingle) headerRow.innerHTML+='<th>Week</th>';
+  if(!isSingle) headerRow.innerHTML+='<th>File</th>';
   stageOrder.forEach(s=>headerRow.innerHTML+=`<th>${s}</th>`);
   headerRow.innerHTML+='<th>TOTAL</th>';
 }

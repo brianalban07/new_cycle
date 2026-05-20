@@ -1,7 +1,5 @@
 importScripts('https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js');
 
-const stageOrder = ["INIT","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
-
 self.onmessage = function(e) {
 
   const {buffers} = e.data;
@@ -9,32 +7,43 @@ self.onmessage = function(e) {
 
   buffers.forEach(buffer => {
 
-    const workbook = XLSX.read(buffer, {type:'array'});
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
+    const wb = XLSX.read(buffer, {type:'array'});
 
     let dur = {};
     let cnt = {};
 
-    json.forEach(r=>{
-      const s = r.Stage;
-      const st = new Date(r.StartTime);
-      const et = new Date(r.EndTime);
+    // ✅ LOOP ALL SHEETS
+    wb.SheetNames.forEach(sheetName => {
 
-      if (s && !isNaN(st) && !isNaN(et)){
-        const d = (et - st)/1000;
+      const sheet = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(sheet);
 
-        if (!dur[s]) { dur[s]=0; cnt[s]=0; }
+      json.forEach(r => {
 
-        dur[s]+=d;
-        cnt[s]++;
-      }
+        const stage = r.Stage;
+        const st = new Date(r.StartTime);
+        const et = new Date(r.EndTime);
+
+        if (stage && !isNaN(st) && !isNaN(et)) {
+
+          const d = (et - st)/1000;
+
+          if (!dur[stage]) {
+            dur[stage] = 0;
+            cnt[stage] = 0;
+          }
+
+          dur[stage] += d;
+          cnt[stage]++;
+        }
+
+      });
+
     });
 
-    results.push({dur,cnt});
+    // ✅ push combined result (all sheets)
+    results.push({dur, cnt});
   });
 
-  // ✅ send back result
   self.postMessage({results});
 };
-``
