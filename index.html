@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Cycle Time Analyzer</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+body { font-family: Arial; margin: 20px; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 20px;
+}
+
+th, td {
+  border: 1px solid black;
+  padding: 8px;
+  text-align: center;
+}
+
+th { background: #6c7a89; color: white; }
+
+.week { background: #f4b400; }
+.total { background: #00a65a; color: white; }
+
+.hidden { display: none; }
+</style>
+</head>
+
+<body>
+
+<h2>Cycle Time Analyzer</h2>
+
+<select id="modeSelect">
+  <option value="">Select Mode</option>
+  <option value="single">Single</option>
+  <option value="multiple">Multiple</option>
+</select>
+
+<input type="number" id="weekCount" class="hidden" min="1" placeholder="Weeks">
+
+<div id="fileContainer"></div>
+
+<button id="calculateBtn" class="hidden">Calculate</button>
+
+<table>
+<thead><tr id="headerRow"></tr></thead>
+<tbody id="bodyRow"></tbody>
+</table>
+
+<script>
+const stageOrder = ["INIT","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
+
+let uploadedFiles = [];
+let worker = new Worker('fileWorker.js');
+
+// ✅ MODE
+modeSelect.onchange = function() {
+  uploadedFiles = [];
+  fileContainer.innerHTML = '';
+  bodyRow.innerHTML = '';
+  calculateBtn.classList.add("hidden");
+
+  if (this.value === "multiple") {
+    weekCount.classList.remove("hidden");
+  } else {
+    weekCount.classList.add("hidden");
+    createInputs(1);
+  }
+};
+
+// ✅ CREATE INPUTS
+weekCount.onchange = function() {
+  createInputs(parseInt(this.value));
+};
+
+function createInputs(count) {
+  fileContainer.innerHTML = '';
+  uploadedFiles = new Array(count).fill(null);
+
+  for (let i=0;i<count;i++) {
+    let div = document.createElement('div');
+
+    div.innerHTML = `
+      Week ${i+1}: <input type="file" data-i="${i}">
+    `;
+
+    div.querySelector('input').onchange = e => {
+      uploadedFiles[i] = e.target.files[0];
+      if (uploadedFiles.every(f=>f)) calculateBtn.classList.remove("hidden");
+    };
+
+    fileContainer.appendChild(div);
+  }
+}
+
+// ✅ HEADER
+function createHeader() {
+  headerRow.innerHTML = "<th>Week</th>";
+  stageOrder.forEach(s=>headerRow.innerHTML+=`<th>${s}</th>`);
+  headerRow.innerHTML += "<th>TOTAL</th>";
+}
+
+// ✅ TIME FORMAT
+function format(sec){
+  const h = String(Math.floor(sec/3600)).padStart(2,'0');
+  const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
+  const s = String(Math.floor(sec%60)).padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+
+// ✅ RECEIVE DATA FROM WORKER
+worker.onmessage = function(e) {
+  const {results} = e.data;
+
+  bodyRow.innerHTML = '';
+  createHeader();
+
+  let allWeekResults = [];
+
+  results.forEach((res, i)=> {
+
+    let total = 0;
+    let row = `<tr><td class="week">${i+1}</td>`;
+
+    let avgObj = {};
+
+    stageOrder.forEach(s=>{
+      const avg = res.dur[s] ? res.dur[s]/res.cnt[s] : 0;
+
+      if (avg>0){
+        total += avg;
+        row += `<td>${format(avg)}</td>`;
+      } else row += `<td>N/A</td>`;
+
+      avgObj[s] = avg;
+    });
+
+    row += `<td class="total">${format(total)}</td></tr>`;
+
+    bodyRow.innerHTML += row;
+    allWeekResults.push(avgObj);
+  });
+
+  // ✅ ALL FILES ROW
+  addAverageRow(allWeekResults);
+};
+
+// ✅ FINAL ROW
+function addAverageRow(allResults) {
+  let row = `<tr><td class="week">All Files</td>`;
+  let total = 0;
+
+  stageOrder.forEach(stage=>{
+
+    let sum=0, count=0;
+
+    allResults.forEach(w=>{
+      if (w[stage]>0){
+        sum+=w[stage];
+        count++;
+      }
+    });
+
+    const avg = count? sum/count : 0;
+
+    if (avg>0){
+      total+=avg;
+      row+=`<td>${format(avg)}</td>`;
+    } else row+=`<td>N/A</td>`;
+  });
+
+  row+=`<td class="total">${format(total)}</td></tr>`;
+  bodyRow.innerHTML += row;
+}
+
+// ✅ SEND FILES TO WORKER
+calculateBtn.onclick = async function(){
+
+  let buffers = [];
+
+  for (let file of uploadedFiles) {
+    buffers.push(await file.arrayBuffer());
+  }
+
+  worker.postMessage({buffers});
+};
+
+</script>
+
+</body>
+</html>
+``
