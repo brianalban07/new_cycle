@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cycle Time Dashboard</title>
 
-<!-- ✅ FIXED LIBRARIES -->
+<!-- ✅ CORRECT CDN -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 *{box-sizing:border-box;}
@@ -19,7 +18,7 @@ body{
   background:#f4f6f9;
 }
 
-/* SIDEBAR */
+/* ✅ SIDEBAR */
 .sidebar{
   width:230px;
   background:#1e293b;
@@ -28,7 +27,14 @@ body{
   min-height:100vh;
 }
 
-/* MAIN */
+.sidebar h2{margin-bottom:20px;}
+
+.sidebar button{
+  width:100%;
+  margin-top:10px;
+}
+
+/* ✅ MAIN */
 .main{
   flex:1;
   display:flex;
@@ -41,7 +47,7 @@ body{
   padding:30px;
 }
 
-/* CARD */
+/* ✅ CARD */
 .card{
   background:#fff;
   padding:25px;
@@ -50,12 +56,12 @@ body{
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
 
-/* FORM */
+/* ✅ FORM */
 .form-grid{
   display:flex;
-  flex-wrap:wrap;
   align-items:center;
   gap:15px;
+  flex-wrap:wrap;
 }
 
 .controls{
@@ -67,27 +73,33 @@ body{
   margin-left:auto;
 }
 
+/* ✅ INPUT */
 input,select{
   padding:10px;
   border-radius:6px;
   border:1px solid #ccc;
 }
 
+/* ✅ BUTTON */
 button{
   padding:10px 18px;
   background:#0078d4;
-  color:white;
+  color:#fff;
   border:none;
   border-radius:6px;
   cursor:pointer;
 }
 
-/* FILE */
+button:hover{
+  background:#005ea6;
+}
+
+/* ✅ FILE INPUT */
 #fileContainer{
   margin-top:15px;
 }
 
-/* PROGRESS */
+/* ✅ PROGRESS */
 .progress{
   height:8px;
   background:#ddd;
@@ -101,13 +113,13 @@ button{
   background:#28a745;
 }
 
-/* TABLE */
+/* ✅ TABLE */
 .table-container{overflow-x:auto;}
 
 table{
   width:100%;
   min-width:900px;
-  border-collapse:collapse;
+  border-collapse: collapse;
 }
 
 th,td{
@@ -117,53 +129,44 @@ th,td{
 }
 
 th{background:#333;color:#fff;}
-.total{background:#28a745;color:white;}
 .week{background:#ffd966;}
+.total{background:#28a745;color:#fff;}
 
-/* LOADING */
+/* ✅ HIDDEN */
+.hidden{display:none;}
+
+/* ✅ LOADING */
 #loadingOverlay{
   position:fixed;
   top:0;left:0;
   width:100%;height:100%;
-  background:rgba(0,0,0,0.6);
+  background:rgba(0,0,0,0.5);
   display:none;
   justify-content:center;
   align-items:center;
-  flex-direction:column;
   color:#fff;
 }
 
 #loadingOverlay.show{
   display:flex;
 }
-
-.spinner{
-  border:5px solid #ccc;
-  border-top:5px solid #0078d4;
-  border-radius:50%;
-  width:50px;
-  height:50px;
-  animation:spin 1s linear infinite;
-}
-
-@keyframes spin{100%{transform:rotate(360deg);}}
-
-.hidden{display:none;}
 </style>
 </head>
 
 <body>
 
+<!-- ✅ SIDEBAR -->
 <div class="sidebar">
-  <h2>Dashboard</h2>
+  <h2>⚙️ Dashboard</h2>
+  <button onclick="exportExcel()">📥 Export Excel</button>
 </div>
 
 <div class="main">
 <div class="content">
 
-<!-- FORM -->
+<!-- ✅ FORM -->
 <div class="card">
-<h2>Cycle Time Analyzer</h2>
+<h2>📊 Cycle Time Analyzer</h2>
 
 <div class="form-grid">
   <div class="controls">
@@ -177,7 +180,7 @@ th{background:#333;color:#fff;}
   </div>
 
   <div class="action-area">
-    <button id="calculateBtn">Calculate</button>
+    <button id="calculateBtn">▶ Calculate</button>
   </div>
 </div>
 
@@ -186,9 +189,10 @@ th{background:#333;color:#fff;}
 <div class="progress">
   <div id="progressBar" class="progress-bar"></div>
 </div>
+
 </div>
 
-<!-- TABLE -->
+<!-- ✅ TABLE -->
 <div id="tableCard" class="card hidden">
 <div class="table-container">
 <table>
@@ -202,14 +206,11 @@ th{background:#333;color:#fff;}
 </div>
 
 <!-- ✅ LOADING -->
-<div id="loadingOverlay">
-<div class="spinner"></div>
-<div>Processing...</div>
-</div>
+<div id="loadingOverlay">Processing...</div>
 
 <script>
 
-// ✅ BASE ORDER
+// ✅ BASE ORDER (WITH PRE-CHECK)
 const baseOrder=["INIT","PRE-CHECK","AST","FLA","IOT","FCT","FC2","IST","FPF","NVL"];
 let stageOrder=[];
 
@@ -217,7 +218,7 @@ let uploadedFiles=[];
 let worker=new Worker('./fileWorker.js');
 let isSingle=false;
 
-// MODE
+// ✅ MODE
 modeSelect.onchange=function(){
 
   fileContainer.innerHTML='';
@@ -233,26 +234,26 @@ modeSelect.onchange=function(){
     isSingle=false;
     weekCount.classList.remove("hidden");
   }
-  else{
-    weekCount.classList.add("hidden");
-  }
 };
 
-// FILE INPUT
+// ✅ CREATE INPUTS
 weekCount.onchange=function(){
   createInputs(parseInt(this.value),false);
 };
 
 function createInputs(count,isSingleMode=false){
+
   fileContainer.innerHTML='';
   uploadedFiles=new Array(count).fill(null);
 
   for(let i=0;i<count;i++){
+
     let div=document.createElement('div');
 
-    div.innerHTML = isSingleMode
+    div.innerHTML=
+      isSingleMode
       ? `<input type="file">`
-      : `File ${i+1}: <input type="file">`;
+      : `📁 File ${i+1}: <input type="file">`;
 
     div.querySelector('input').onchange=e=>{
       uploadedFiles[i]=e.target.files[0];
@@ -262,31 +263,40 @@ function createInputs(count,isSingleMode=false){
   }
 }
 
-// HEADER
+// ✅ HEADER
 function createHeader(){
+
   headerRow.innerHTML='';
-  if(!isSingle) headerRow.innerHTML+='<th>File</th>';
-  stageOrder.forEach(s=>headerRow.innerHTML+=`<th>${s}</th>`);
+
+  if(!isSingle){
+    headerRow.innerHTML+='<th>File</th>';
+  }
+
+  stageOrder.forEach(s=>{
+    headerRow.innerHTML+=`<th>${s}</th>`;
+  });
+
   headerRow.innerHTML+='<th>TOTAL</th>';
 }
 
-// FORMAT
+// ✅ FORMAT
 function format(sec){
   let h=Math.floor(sec/3600);
   let m=Math.floor((sec%3600)/60);
   let s=Math.floor(sec%60);
+
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
 }
 
-// ✅ CALCULATE (WORKING)
+// ✅ CALCULATE
 calculateBtn.onclick = async function(){
 
-  if (!modeSelect.value) {
+  if (!modeSelect.value){
     alert("Select mode first");
     return;
   }
 
-  if (uploadedFiles.length === 0 || uploadedFiles.some(f=>!f)) {
+  if (uploadedFiles.length === 0 || uploadedFiles.some(f=>!f)){
     alert("Select file(s) first");
     return;
   }
@@ -322,6 +332,8 @@ worker.onmessage=function(e){
 
   createHeader();
 
+  let all=[];
+
   results.forEach((r,i)=>{
 
     let total=0;
@@ -331,19 +343,72 @@ worker.onmessage=function(e){
       row+=`<td class="week">${i+1}</td>`;
     }
 
-    stageOrder.forEach(s=>{
-      let avg=r.dur[s]?r.dur[s]/r.cnt[s]:0;
-      total+=avg;
+    let weekAvg={};
 
-      row+=`<td>${format(avg)}</td>`;
+    stageOrder.forEach(s=>{
+
+      let avg=r.dur[s]?r.dur[s]/r.cnt[s]:0;
+
+      if(avg>0){
+        total+=avg;
+        row+=`<td>${format(avg)}</td>`;
+      }else{
+        row+="<td>N/A</td>";
+      }
+
+      weekAvg[s]=avg;
     });
 
     row+=`<td class="total">${format(total)}</td></tr>`;
     bodyRow.innerHTML+=row;
+
+    all.push(weekAvg);
   });
+
+  // ✅ ✅ ✅ RESTORE "ALL FILES" ROW
+  if(!isSingle && results.length>1){
+    addAverageRow(all);
+  }
 
   tableCard.classList.remove("hidden");
 };
+
+// ✅ ALL FILES ROW
+function addAverageRow(all){
+
+  let row="<tr><td class='week'>All Files</td>";
+  let total=0;
+
+  stageOrder.forEach(stage=>{
+
+    let sum=0,count=0;
+
+    all.forEach(w=>{
+      if(w[stage]>0){
+        sum+=w[stage];
+        count++;
+      }
+    });
+
+    let avg=count?sum/count:0;
+
+    if(avg>0){
+      total+=avg;
+      row+=`<td>${format(avg)}</td>`;
+    }else{
+      row+="<td>N/A</td>";
+    }
+  });
+
+  row+=`<td class="total">${format(total)}</td></tr>`;
+  bodyRow.innerHTML+=row;
+}
+
+// ✅ EXPORT
+function exportExcel(){
+  let wb=XLSX.utils.table_to_book(document.querySelector("table"));
+  XLSX.writeFile(wb,"CycleTime.xlsx");
+}
 
 </script>
 
